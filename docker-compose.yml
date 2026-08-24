@@ -1,0 +1,41 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: incar-music-backend
+    restart: unless-stopped
+    volumes:
+      # 绿联 NAS 音乐目录
+      - /volume1/音乐:/music:ro
+      # 持久化数据
+      - incar-data:/app/data
+    environment:
+      - MUSIC_LIBRARY_PATH=/music
+      - DATABASE_URL=sqlite+aiosqlite:///./data/incar_music.db
+      - CACHE_DIR=/app/data/cache
+      - HLS_DIR=/app/data/hls
+      - COVER_DIR=/app/data/covers
+      - MAX_CACHE_SIZE_MB=2048
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: incar-music-frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  incar-data:
+    driver: local

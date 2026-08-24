@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+
+# Data
+data/
+*.db
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+dist/
+.npm
+
+# Environment
+.env
+.env.local
+
+# Docker
+docker-compose.override.yml
+
+# HLS segments (generated)
+*.m3u8
+*.ts
+*.aac
