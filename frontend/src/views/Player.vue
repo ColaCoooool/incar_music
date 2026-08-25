@@ -1,63 +1,59 @@
 <template>
   <div class="player-view">
-    <!-- Cover Art -->
-    <div v-if="playerStore.currentSong">
-      <img
-        v-if="playerStore.currentSong.cover_url"
-        :src="playerStore.currentSong.cover_url"
-        class="player-cover"
-        alt="Album Cover"
-      />
+    <!-- Cover + Lyrics side by side (wide), stacked (narrow) -->
+    <div class="player-main">
+      <div v-if="playerStore.currentSong">
+        <img
+          v-if="playerStore.currentSong.cover_url"
+          :src="playerStore.currentSong.cover_url"
+          class="player-cover"
+          alt="Album Cover"
+        />
+        <div v-else class="player-cover player-cover-placeholder">🎵</div>
+      </div>
       <div v-else class="player-cover player-cover-placeholder">🎵</div>
-    </div>
-    <div v-else class="player-cover player-cover-placeholder">🎵</div>
 
-    <!-- Song Info -->
-    <div class="player-info">
-      <div class="player-title">
-        {{ playerStore.currentSong?.title || '未在播放' }}
-      </div>
-      <div class="player-artist">
-        {{ playerStore.currentSong?.artist_name || '选择一首歌曲开始' }}
+      <div class="player-info">
+        <div class="player-title">
+          {{ playerStore.currentSong?.title || '未在播放' }}
+        </div>
+        <div class="player-artist">
+          {{ playerStore.currentSong?.artist_name || '选择一首歌曲开始' }}
+        </div>
+        <div v-if="playerStore.lyrics.length" class="lyrics-container" ref="lyricsContainer">
+          <div
+            v-for="(line, index) in playerStore.lyrics"
+            :key="index"
+            class="lyric-line"
+            :class="{ active: index === playerStore.currentLyricIndex }"
+          >
+            {{ line.text }}
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Progress Bar -->
-    <div class="player-progress">
+    <!-- Control bar -->
+    <div class="player-controls">
       <div class="progress-bar" @click="handleSeek">
         <div class="progress-fill" :style="{ width: playerStore.progress + '%' }"></div>
+        <div class="progress-thumb" :style="{ left: playerStore.progress + '%' }"></div>
       </div>
       <div class="progress-times">
         <span>{{ formatTime(playerStore.currentTime) }}</span>
         <span>{{ formatTime(playerStore.duration) }}</span>
       </div>
-    </div>
-
-    <!-- Controls -->
-    <div class="player-controls">
-      <button class="control-btn" @click="playerStore.prev">⏮</button>
-      <button class="control-btn play" @click="playerStore.togglePlay">
-        {{ playerStore.isPlaying ? '⏸' : '▶️' }}
-      </button>
-      <button class="control-btn" @click="playerStore.next">⏭</button>
-    </div>
-
-    <!-- Lyrics -->
-    <div v-if="playerStore.lyrics.length" class="lyrics-container" ref="lyricsContainer">
-      <div
-        v-for="(line, index) in playerStore.lyrics"
-        :key="index"
-        class="lyric-line"
-        :class="{ active: index === playerStore.currentLyricIndex }"
-      >
-        {{ line.text }}
+      <div class="player-buttons">
+        <button class="control-btn" @click="playerStore.prev">⏮</button>
+        <button class="control-btn play" @click="playerStore.togglePlay">
+          {{ playerStore.isPlaying ? '⏸' : '▶️' }}
+        </button>
+        <button class="control-btn" @click="playerStore.next">⏭</button>
       </div>
-    </div>
-
-    <!-- Quick actions -->
-    <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: center;">
-      <button class="btn btn-secondary" @click="shufflePlay">🔀 随机播放</button>
-      <button class="btn btn-secondary" @click="loadAllSongs">📋 加载全部</button>
+      <div style="display: flex; gap: 12px; justify-content: center; padding-top: 8px;">
+        <button class="btn btn-secondary" @click="shufflePlay">🔀 随机播放</button>
+        <button class="btn btn-secondary" @click="loadAllSongs">📋 加载全部</button>
+      </div>
     </div>
   </div>
 </template>
