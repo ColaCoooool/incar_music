@@ -62,6 +62,34 @@ def test_scan_finds_music_in_nested_subdirectories(client, music_library):
     assert "21" in by_title["Rolling in the Deep"]
 
 
+def test_scan_removes_songs_whose_files_were_deleted(client, music_library):
+    """After a file is deleted on disk, rescan must remove its song from the library."""
+    from helpers import _make_wav, _tag_wav
+
+    r = scan(client)
+    assert r.status_code == 200, r.text
+    assert client.get("/api/library/stats").json()["total_songs"] == 5
+
+    # Simulate deleting one audio file on disk
+    gone = music_library / "Adele" / "21" / "t3.wav"
+    assert gone.exists()
+    gone.unlink()
+
+    r2 = scan(client)
+    assert r2.status_code == 200, r2.text
+    stats = r2.json()["stats"]
+    assert stats["removed"] == 1, stats
+
+    songs = client.get("/api/songs/").json()
+    titles = {s["title"] for s in songs}
+    assert "Rolling in the Deep" not in titles
+    assert len(titles) == 4
+
+    # Restore the file so the shared session-scoped library stays intact
+    _make_wav(gone, 5)
+    _tag_wav(gone, "Rolling in the Deep", "Adele", "21", "Pop", 2011, 1)
+
+
 def test_garbage_file_skipped(client, music_library):
     """Unparseable audio files must not be added to the library."""
     scan(client)

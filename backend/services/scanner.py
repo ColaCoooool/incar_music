@@ -14,7 +14,7 @@ from mutagen import File as MutagenFile
 from mutagen.id3 import ID3, ID3NoHeaderError
 from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
@@ -194,16 +194,18 @@ async def scan_library(db: AsyncSession, force: bool = False) -> dict:
         logger.error(f"Music library path does not exist: {library_path}")
         return {"error": "Library path not found", "added": 0, "updated": 0, "skipped": 0}
 
-    stats = {"added": 0, "updated": 0, "skipped": 0, "errors": 0}
+    stats = {"added": 0, "updated": 0, "skipped": 0, "errors": 0, "removed": 0}
 
     # Get existing file paths
     result = await db.execute(select(Song.file_path))
     existing_paths = {row[0] for row in result.all()}
+    seen_paths = set()
 
     # Walk through all audio files
     for root, _, files in os.walk(library_path):
         for filename in files:
             file_path = Path(root) / filename
+            seen_paths.add(str(file_path))
             if file_path.suffix.lower() not in SUPPORTED_FORMATS:
                 continue
 
@@ -265,6 +267,33 @@ async def scan_library(db: AsyncSession, force: bool = False) -> dict:
             except Exception as e:
                 logger.error(f"Error processing {file_path}: {e}")
                 stats["errors"] += 1
+
+    # Remove songs whose files no longer exist on disk (e.g. deleted by user)
+    result = await db.execute(select(Song.file_path))
+    all_paths = [row[0] for row in result.all()]
+    stale_paths = [p for p in all_paths if p not in seen_paths]
+    if stale_paths:
+        from models.cover import CoverArt
+        from models.lyrics import Lyrics
+        from models.playlist import PlaylistSong
+
+        id_result = await db.execute(
+            select(Song.id).where(Song.file_path.in_(stale_paths))
+        )
+        stale_ids = [row[0] for row in id_result.all()]
+        for model in (Lyrics, CoverArt, PlaylistSong):
+            related = await db.execute(
+                select(model).where(model.song_id.in_(stale_ids))
+            )
+            for row in related.scalars().all():
+                await db.delete(row)
+        await db.execute(
+            delete(Song)
+            .where(Song.file_path.in_(stale_paths))
+            .execution_options(synchronize_session=False)
+        )
+        stats["removed"] = len(stale_paths)
+        logger.info(f"Scan removed {len(stale_paths)} songs with missing files")
 
     await db.commit()
     logger.info(f"Scan complete: {stats}")
