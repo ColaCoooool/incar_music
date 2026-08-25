@@ -1,0 +1,32 @@
+# VCS
+.git
+.gitignore
+
+# Docs / plans / specs
+docs/
+
+# Test assets
+tests/
+test_music/
+test_music_pytest/
+
+# Brainstorm sessions
+.superpowers/
+
+# Python
+backend/.venv/
+**/__pycache__/
+*.pyc
+backend/data/
+*.db
+*.sqlite
+.env
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Misc
+*.log
+.DS_Store
+Thumbs.db
