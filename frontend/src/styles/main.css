@@ -529,7 +529,6 @@ body {
   border: none;
   background: var(--accent);
   color: var(--accent-contrast);
-  font-size: 22px;
   cursor: pointer;
   border-radius: 50%;
   display: flex;
@@ -539,14 +538,19 @@ body {
   transition: background 0.2s;
 }
 
-.control-btn:hover {
-  background: var(--accent-hover);
+.ctrl-icon {
+  width: 28px;
+  height: 28px;
 }
 
 .control-btn.play {
   width: 64px;
   height: 64px;
-  font-size: 24px;
+}
+
+.control-btn.play .ctrl-icon {
+  width: 32px;
+  height: 32px;
 }
 
 /* Narrow screens: stacked layout */
