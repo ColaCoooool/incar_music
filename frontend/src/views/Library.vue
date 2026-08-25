@@ -69,6 +69,20 @@
           </div>
         </div>
         <div class="song-duration">{{ formatTime(song.duration) }}</div>
+        <div class="song-actions" @click.stop>
+          <button class="btn btn-secondary add-to-playlist-btn" @click="showPlaylistPicker(song)">＋</button>
+          <div v-if="pickerSong && pickerSong.id === song.id" class="playlist-picker">
+            <div
+              v-for="pl in pickerPlaylists"
+              :key="pl.id"
+              class="playlist-picker-item"
+              @click="addToPlaylist(pl, song)"
+            >
+              {{ pl.name }}
+            </div>
+            <div v-if="!pickerPlaylists.length" class="playlist-picker-item muted">暂无歌单</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -96,8 +110,36 @@ const scanning = ref(false)
 const filling = ref(false)
 const searchQuery = ref('')
 const tab = ref('songs')
+const pickerSong = ref(null)
+const pickerPlaylists = ref([])
 
 let searchTimeout = null
+
+async function showPlaylistPicker(song) {
+  pickerSong.value = pickerSong.value?.id === song.id ? null : song
+  if (pickerSong.value) {
+    try {
+      const resp = await fetch('/api/playlists')
+      pickerPlaylists.value = await resp.json()
+    } catch (err) {
+      console.error('Failed to load playlists:', err)
+      pickerPlaylists.value = []
+    }
+  }
+}
+
+async function addToPlaylist(pl, song) {
+  try {
+    await fetch(`/api/playlists/${pl.id}/songs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ song_id: song.id }),
+    })
+  } catch (err) {
+    console.error('Failed to add song to playlist:', err)
+  }
+  pickerSong.value = null
+}
 
 function formatTime(seconds) {
   if (!seconds) return ''
