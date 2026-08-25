@@ -43,3 +43,5 @@ docker-compose.override.yml
 # Generated test media
 test_music/
 test_music_pytest/
+
+# Brainstorm visual companion sessions.superpowers/
