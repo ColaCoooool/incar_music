@@ -527,31 +527,26 @@ body {
   width: 56px;
   height: 56px;
   border: none;
-  background: var(--bg-hover);
+  background: var(--accent);
+  color: var(--accent-contrast);
   font-size: 22px;
   cursor: pointer;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 4px 18px rgba(29, 185, 84, 0.4);
   transition: background 0.2s;
 }
 
 .control-btn:hover {
-  background: var(--bg-card);
+  background: var(--accent-hover);
 }
 
 .control-btn.play {
   width: 64px;
   height: 64px;
-  background: var(--accent);
   font-size: 24px;
-  color: var(--accent-contrast);
-  box-shadow: 0 4px 18px rgba(29, 185, 84, 0.4);
-}
-
-.control-btn.play:hover {
-  background: var(--accent-hover);
 }
 
 /* Narrow screens: stacked layout */
