@@ -39,3 +39,7 @@ docker-compose.override.yml
 *.m3u8
 *.ts
 *.aac
+
+# Generated test media
+test_music/
+test_music_pytest/
