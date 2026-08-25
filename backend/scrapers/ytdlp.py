@@ -17,6 +17,16 @@ logger = logging.getLogger(__name__)
 # Prefer an audio-only container; fall back to whatever audio yt-dlp finds.
 _FORMAT_SELECTION = "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best"
 
+# Douyin serves only muxed video+audio streams (no audio-only format). Pick a
+# low-bitrate stream to save bandwidth, then extract the audio track and
+# delete the video file to save storage.
+_DOUYIN_FORMAT_SELECTION = "worst[tbr<=400]/worst/best"
+_AUDIO_EXTRACT = {
+    "key": "FFmpegExtractAudio",
+    "preferredcodec": "m4a",
+    "preferredquality": "128",
+}
+
 
 def cookies_file_path() -> Optional[Path]:
     """Resolve the cookies file used by yt-dlp.
@@ -34,9 +44,8 @@ def cookies_file_path() -> Optional[Path]:
     return default if default.exists() else None
 
 
-def _ydl_opts(output_dir: Path) -> dict:
+def _ydl_opts(output_dir: Path, platform: str) -> dict:
     opts = {
-        "format": _FORMAT_SELECTION,
         "outtmpl": str(output_dir / "%(title).120B.%(ext)s"),
         "noplaylist": True,
         "quiet": True,
@@ -45,6 +54,11 @@ def _ydl_opts(output_dir: Path) -> dict:
         "socket_timeout": 30,
         "retries": 2,
     }
+    if platform == "douyin":
+        opts["format"] = _DOUYIN_FORMAT_SELECTION
+        opts["postprocessors"] = [_AUDIO_EXTRACT]
+    else:
+        opts["format"] = _FORMAT_SELECTION
     cookies = cookies_file_path()
     if cookies:
         opts["cookiefile"] = str(cookies)
@@ -52,14 +66,14 @@ def _ydl_opts(output_dir: Path) -> dict:
 
 
 def _run_extract(url: str, output_dir: Path) -> Optional[dict]:
-    with yt_dlp.YoutubeDL(_ydl_opts(output_dir)) as ydl:
+    platform = "bilibili" if "bilibili" in url else "douyin"
+    with yt_dlp.YoutubeDL(_ydl_opts(output_dir, platform)) as ydl:
         info = ydl.extract_info(url, download=False)
         if not info:
             return None
 
         title = info.get("title") or "audio"
         artist = info.get("uploader") or info.get("creator") or ""
-        platform = "bilibili" if "bilibili" in url else "douyin"
 
         ydl.download([url])
 

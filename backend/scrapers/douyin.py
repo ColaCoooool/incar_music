@@ -19,6 +19,7 @@ def extract_douyin_id(url: str) -> Optional[str]:
         r"douyin\.com/note/(\d+)",
         r"v\.douyin\.com/([\w]+)",
         r"(?<!\w)(\d{19,})(?!\w)",
+        r"modal_id=(\d+)",  # user/self?...&modal_id=<video id> profile modal links
     ]
     for pattern in patterns:
         match = re.search(pattern, url)

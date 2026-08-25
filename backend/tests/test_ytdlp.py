@@ -54,14 +54,17 @@ def _make_fake(monkeypatch, **kwargs):
 
 
 async def test_extract_audio_requests_audio_only(tmp_path, monkeypatch):
-    """The format selection must request audio streams, never the full video."""
+    """Douyin: low-bitrate stream + audio extraction postprocessor; never full quality video."""
     from scrapers import ytdlp
 
     fake = _make_fake(monkeypatch)
     result = await ytdlp.extract_audio("https://www.douyin.com/video/123", tmp_path)
 
     assert fake.calls["downloaded"] is True
-    assert "bestaudio" in fake.opts["format"]
+    assert "worst" in fake.opts["format"]
+    assert "bestaudio" not in fake.opts["format"]
+    pp = fake.opts.get("postprocessors") or []
+    assert any(p.get("key") == "FFmpegExtractAudio" for p in pp)
     assert result is not None
     assert result["title"] == "测试歌曲"
     assert result["artist"] == "UP主"
@@ -70,12 +73,15 @@ async def test_extract_audio_requests_audio_only(tmp_path, monkeypatch):
     assert (tmp_path / "测试歌曲.m4a").exists()
 
 
-async def test_extract_audio_bilibili_platform(tmp_path, monkeypatch):
+async def test_extract_audio_bilibili_uses_audio_only_format(tmp_path, monkeypatch):
+    """Bilibili: prefer bestaudio (DASH audio-only stream) and no video extraction."""
     from scrapers import ytdlp
 
     fake = _make_fake(monkeypatch)
     result = await ytdlp.extract_audio("https://www.bilibili.com/video/BV1GJ411x7h7", tmp_path)
     assert result["platform"] == "bilibili"
+    assert "bestaudio" in fake.opts["format"]
+    assert "postprocessors" not in fake.opts
 
 
 async def test_extract_audio_failure_returns_none(tmp_path, monkeypatch):
@@ -106,10 +112,33 @@ async def test_extract_audio_skips_cookies_when_missing(tmp_path, monkeypatch):
     from scrapers import ytdlp
 
     monkeypatch.setattr(settings, "YTDLP_COOKIES_FILE", str(tmp_path / "nope.txt"))
+    # Isolate from any real cookies file uploaded during manual testing
+    monkeypatch.setattr(ytdlp, "cookies_file_path", lambda: None)
     fake = _make_fake(monkeypatch)
 
     await ytdlp.extract_audio("https://www.douyin.com/video/123", tmp_path)
     assert "cookiefile" not in fake.opts
+
+
+async def test_extract_douyin_id_modal_url():
+    from scrapers.douyin import extract_douyin_id
+
+    vid = extract_douyin_id(
+        "https://www.douyin.com/user/self?from_tab_name=main&modal_id=7649466689309953299&showSubTab=video"
+    )
+    assert vid == "7649466689309953299"
+
+
+def test_normalize_douyin_url():
+    from api.scraper import _normalize_douyin_url
+
+    original = "https://www.douyin.com/user/self?from_tab_name=main&modal_id=7649466689309953299"
+    normalized = _normalize_douyin_url(original, "7649466689309953299")
+    assert normalized == "https://www.douyin.com/video/7649466689309953299"
+
+    # Standard video URLs pass through unchanged
+    standard = "https://www.douyin.com/video/7123456789012345678"
+    assert _normalize_douyin_url(standard, "7123456789012345678") == standard
 
 
 async def test_douyin_endpoint_uses_ytdlp(client, music_library, monkeypatch):
@@ -143,3 +172,28 @@ async def test_douyin_endpoint_uses_ytdlp(client, music_library, monkeypatch):
 
     detail = client.get(f"/api/songs/{data['song_id']}").json()
     assert detail["title"] == "抖音测试"
+
+
+async def test_douyin_duplicate_scrape_returns_409(client, music_library, monkeypatch):
+    """Scraping the same URL twice must report 409, not crash on UNIQUE constraint."""
+    from conftest import scan
+    from scrapers import ytdlp
+
+    scan(client)
+
+    async def fake_extract(url, output_dir):
+        out = output_dir / "重复歌曲.m4a"
+        out.write_bytes(b"fakeaudio")
+        return {
+            "title": "重复歌曲",
+            "artist": "作者",
+            "file_path": str(out),
+            "platform": "douyin",
+        }
+
+    monkeypatch.setattr(ytdlp, "extract_audio", fake_extract)
+
+    url = "https://www.douyin.com/video/7123456789012345678"
+    assert client.post("/api/scraper/douyin", json={"url": url}).status_code == 200
+    r2 = client.post("/api/scraper/douyin", json={"url": url})
+    assert r2.status_code == 409, r2.text

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
@@ -79,13 +80,30 @@ async def _store_scraped_song(
     title: str,
     file_path: str,
 ) -> int:
-    """Insert a scraped audio file into the library and return its song id."""
+    """Insert a scraped audio file into the library and return its song id.
+
+    Raises 409 when the file was already scraped before.
+    """
+    from services.scanner import extract_metadata
+
+    existing = (
+        await db.execute(select(Song.id).where(Song.file_path == file_path))
+    ).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail="该音频已在曲库中")
+
+    meta = extract_metadata(Path(file_path)) or {}
     song = Song(
         title=title,
         file_path=file_path,
         relative_path=str(Path(file_path).relative_to(settings.MUSIC_LIBRARY_PATH)),
         format=Path(file_path).suffix.lower().lstrip("."),
         source_url=url,
+        duration=meta.get("duration"),
+        bitrate=meta.get("bitrate"),
+        sample_rate=meta.get("sample_rate"),
+        channels=meta.get("channels"),
+        file_size=meta.get("file_size"),
     )
     db.add(song)
     await db.commit()
@@ -161,6 +179,14 @@ async def scrape_bilibili(
     return await _scrape_via_ytdlp(db, request, "bilibili")
 
 
+def _normalize_douyin_url(url: str, video_id: str) -> str:
+    """Rewrite profile-modal links (user/self?...modal_id=) that yt-dlp cannot
+    handle into a standard /video/<id> URL."""
+    if "modal_id=" in url or "/user/" in url:
+        return f"https://www.douyin.com/video/{video_id}"
+    return url
+
+
 @router.post("/douyin", response_model=ScrapeResponse)
 async def scrape_douyin(
     request: ScrapeRequest,
@@ -171,7 +197,11 @@ async def scrape_douyin(
     if not video_id:
         raise HTTPException(status_code=400, detail="Invalid Douyin URL")
 
-    return await _scrape_via_ytdlp(db, request, "douyin")
+    return await _scrape_via_ytdlp(
+        db,
+        ScrapeRequest(url=_normalize_douyin_url(request.url, video_id)),
+        "douyin",
+    )
 
 
 @router.post("/auto")

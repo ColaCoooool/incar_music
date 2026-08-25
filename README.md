@@ -178,10 +178,13 @@ incar_music/
 
 ### 🕷️ 音乐爬取
 
-输入 B 站或抖音视频链接，**只下载音频流**（不下载视频，节约流量与车机存储）：
+输入 B 站或抖音视频链接，**只下载音频**（不下载视频，节约流量与车机存储）：
 
 - **B 站**：优先走 bilibili DASH API 直接获取音频流（m4a）；失败时自动回退 yt-dlp。
-- **抖音**：通过 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 获取音频流。抖音反爬要求**新鲜 cookies**：
+- **抖音**：通过 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 获取音频。抖音只有"视频+音频"混合流，因此自动选择**低码率流下载（约省一半流量），下载后用 ffmpeg 提取音频并删除视频**（实测 57MB 下载 → 8MB 存储）。
+- **链接格式**：支持标准视频链接（`douyin.com/video/{id}`）、分享短链（`v.douyin.com/xxx`）以及主页弹窗链接（`user/self?...&modal_id={id}`，自动规范化）。
+- **重复爬取**：同一音频已入库时返回 409 提示，不会重复下载。
+- 抖音反爬要求**新鲜 cookies**，在设置页上传即可：
   1. 用浏览器登录抖音后，通过扩展（如 "Get cookies.txt"）导出 cookies 文件（Netscape 格式）
   2. 将文件放到 NAS，例如 `/volume1/docker/incar/cookies.txt`
   3. 在 `docker-compose.yml` 的 backend 环境变量中配置：
