@@ -35,13 +35,77 @@ export const usePlayerStore = defineStore('player', () => {
     })
 
     audio.value.addEventListener('ended', () => {
+      updateMediaSession()
       next()
     })
 
     audio.value.addEventListener('error', (e) => {
       console.error('Audio error:', e)
       isPlaying.value = false
+      updateMediaSession()
     })
+
+    setupMediaSession()
+
+    // Keyboard fallback for car browsers that map hardware keys to key events
+    window.addEventListener('keydown', onMediaKey)
+  }
+
+  function setupMediaSession() {
+    if (!('mediaSession' in navigator)) return
+    try {
+      navigator.mediaSession.setActionHandler('play', () => {
+        if (!isPlaying.value) togglePlay()
+      })
+      navigator.mediaSession.setActionHandler('pause', () => {
+        if (isPlaying.value) togglePlay()
+      })
+      navigator.mediaSession.setActionHandler('previoustrack', () => prev())
+      navigator.mediaSession.setActionHandler('nexttrack', () => next())
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (details.seekTime != null) seek(details.seekTime)
+      })
+    } catch (e) {
+      // Media Session not fully supported — keyboard fallback still active
+    }
+  }
+
+  function updateMediaSession() {
+    if (!('mediaSession' in navigator)) return
+    try {
+      const song = currentSong.value
+      if (song) {
+        const meta = {
+          title: song.title,
+          artist: song.artist_name || '',
+          album: song.album_title || '',
+        }
+        if (song.cover_url) {
+          meta.artwork = [{ src: song.cover_url, sizes: '512x512' }]
+        }
+        navigator.mediaSession.metadata = new MediaMetadata(meta)
+      }
+      navigator.mediaSession.playbackState = isPlaying.value ? 'playing' : 'paused'
+    } catch (e) {
+      // not supported
+    }
+  }
+
+  function onMediaKey(e) {
+    switch (e.key) {
+      case 'MediaTrackNext':
+        e.preventDefault()
+        next()
+        break
+      case 'MediaTrackPrevious':
+        e.preventDefault()
+        prev()
+        break
+      case 'MediaPlayPause':
+        e.preventDefault()
+        togglePlay()
+        break
+    }
   }
 
   function playSong(song) {
@@ -53,6 +117,7 @@ export const usePlayerStore = defineStore('player', () => {
     const url = `/api/stream/${song.id}?bitrate=${bitrate.value}`
     audio.value.src = url
     audio.value.play().catch(() => {})
+    updateMediaSession()
 
     // Fetch lyrics
     fetchLyrics(song.id)
@@ -74,6 +139,7 @@ export const usePlayerStore = defineStore('player', () => {
       audio.value.play().catch(() => {})
       isPlaying.value = true
     }
+    updateMediaSession()
   }
 
   function next() {
