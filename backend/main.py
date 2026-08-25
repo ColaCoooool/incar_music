@@ -4,9 +4,8 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from core.config import settings
 from models.database import init_db
@@ -63,6 +62,7 @@ from api.library import router as library_router
 from api.covers import router as covers_router
 from api.lyrics import router as lyrics_router
 from api.scraper import router as scraper_router
+from api.playlists import router as playlists_router
 
 app.include_router(songs_router)
 app.include_router(streaming_router)
@@ -70,6 +70,7 @@ app.include_router(library_router)
 app.include_router(covers_router)
 app.include_router(lyrics_router)
 app.include_router(scraper_router)
+app.include_router(playlists_router)
 
 
 @app.get("/api/health")
@@ -85,4 +86,16 @@ async def health_check():
 # Serve frontend static files (if built)
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
 if frontend_dist.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
+    from fastapi.responses import FileResponse
+
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str):
+        """Serve the built SPA with history-mode fallback (client-side routes)."""
+        # Never swallow unmatched API routes
+        if full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not Found")
+        requested = (frontend_dist / full_path).resolve()
+        # Only serve files inside the dist directory
+        if full_path and requested.is_file() and str(requested).startswith(str(frontend_dist.resolve())):
+            return FileResponse(requested)
+        return FileResponse(frontend_dist / "index.html")
