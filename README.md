@@ -174,6 +174,22 @@ incar_music/
 | `MAX_CACHE_SIZE_MB` | `2048` | 最大缓存大小 (MB) |
 | `HOST` | `0.0.0.0` | 监听地址 |
 | `PORT` | `8000` | 监听端口 |
+| `YTDLP_COOKIES_FILE` | 空 | 抖音爬取所需 cookies 文件（Netscape 格式）路径，见下文「音乐爬取」 |
+
+### 🕷️ 音乐爬取
+
+输入 B 站或抖音视频链接，**只下载音频流**（不下载视频，节约流量与车机存储）：
+
+- **B 站**：优先走 bilibili DASH API 直接获取音频流（m4a）；失败时自动回退 yt-dlp。
+- **抖音**：通过 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 获取音频流。抖音反爬要求**新鲜 cookies**：
+  1. 用浏览器登录抖音后，通过扩展（如 "Get cookies.txt"）导出 cookies 文件（Netscape 格式）
+  2. 将文件放到 NAS，例如 `/volume1/docker/incar/cookies.txt`
+  3. 在 `docker-compose.yml` 的 backend 环境变量中配置：
+     ```yaml
+     - YTDLP_COOKIES_FILE=/app/cookies.txt
+     ```
+     （并确保该文件已挂载进容器，或在镜像内放置）
+  4. 未配置 cookies 时抖音爬取会返回明确错误提示。
 
 ### 音质设置
 

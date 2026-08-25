@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     MUSICBRAINZ_ENABLED: bool = True
     NETEASE_API_ENABLED: bool = True
 
+    # Scraper (yt-dlp)
+    # Optional cookies file (Netscape format) for sites requiring login/fresh
+    # cookies (e.g. Douyin). Deploy a cookies.txt on the NAS and point here.
+    YTDLP_COOKIES_FILE: Optional[str] = None
+
     # Cover art
     COVER_DIR: str = "./data/covers"
     COVER_MAX_SIZE: int = 600  # pixels
