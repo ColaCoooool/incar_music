@@ -46,6 +46,7 @@
       <div class="player-buttons">
         <div class="quick-actions">
           <button class="quick-btn" @click="shufflePlay" title="随机播放">🔀</button>
+          <button class="quick-btn" :class="{ active: showQueue }" @click="showQueue = !showQueue" title="播放队列">📜</button>
         </div>
         <div class="transport-controls">
           <button class="control-btn" @click="playerStore.prev">⏮</button>
@@ -54,6 +55,31 @@
           </button>
           <button class="control-btn" @click="playerStore.next">⏭</button>
         </div>
+      </div>
+
+      <!-- Current queue (temporary playlist) -->
+      <div v-if="showQueue" class="queue-panel">
+        <div class="queue-header">
+          <span>播放队列（{{ playerStore.playlist.length }} 首）</span>
+          <button class="btn btn-secondary queue-close" @click="showQueue = false">✕</button>
+        </div>
+        <div v-if="playerStore.playlist.length" class="queue-list">
+          <div
+            v-for="(song, index) in playerStore.playlist"
+            :key="song.id"
+            class="queue-item"
+            :class="{ current: index === playerStore.currentIndex }"
+            @click="jumpTo(index)"
+          >
+            <span class="queue-index">{{ index + 1 }}</span>
+            <div class="song-info">
+              <div class="queue-title">{{ song.title }}</div>
+              <div class="queue-meta">{{ song.artist_name }}</div>
+            </div>
+            <span v-if="index === playerStore.currentIndex" class="queue-playing">▶</span>
+          </div>
+        </div>
+        <div v-else class="queue-empty">队列为空，去曲库选歌吧</div>
       </div>
     </div>
   </div>
@@ -65,6 +91,12 @@ import { usePlayerStore } from '../stores/player'
 
 const playerStore = usePlayerStore()
 const lyricsContainer = ref(null)
+const showQueue = ref(false)
+
+function jumpTo(index) {
+  // Jump to a song in the current queue
+  playerStore.setPlaylist(playerStore.playlist, index)
+}
 
 function formatTime(seconds) {
   if (!seconds || isNaN(seconds)) return '0:00'
