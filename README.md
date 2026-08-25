@@ -235,6 +235,16 @@ npm run dev
 | `/api/covers/{song_id}` | GET | 获取封面 |
 | `/api/scraper/auto` | POST | 自动爬取音频 |
 | `/api/stream/cache/stats` | GET | 缓存统计 |
+| `/api/playlists/` | GET/POST | 歌单列表 / 创建 |
+| `/api/playlists/{id}` | GET/PUT/DELETE | 歌单详情 / 重命名 / 删除 |
+| `/api/playlists/{id}/songs` | POST | 添加歌曲到歌单（幂等） |
+| `/api/playlists/{id}/songs/{song_id}` | DELETE | 从歌单移除歌曲 |
+
+## 📱 PWA 与离线播放
+
+- **PWA**：支持添加到主屏幕（manifest + 图标），HTTPS 或 localhost 环境下生效。
+- **离线播放**：Service Worker 会自动缓存播放过的歌曲（`/api/stream/*`），断网时可直接回放已缓存的歌曲；静态资源也已缓存，可离线打开应用。
+- **注意**：Service Worker 仅 HTTPS 或 localhost 可用。通过手机热点以 `http://内网IP:8080` 直连时，PWA 与离线播放会静默降级（不影响在线播放）。如需离线能力，请为 NAS 配置 HTTPS（如反向代理 + 自签证书）。
 
 ## 📄 License
 
