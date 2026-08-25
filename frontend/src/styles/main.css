@@ -375,8 +375,44 @@ body {
 .player-buttons {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quick-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.quick-btn {
+  width: 56px;
+  height: 56px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: background 0.2s;
+}
+
+.quick-btn:active {
+  background: var(--bg-card);
+}
+
+.transport-controls {
+  display: flex;
+  align-items: center;
   justify-content: center;
   gap: 20px;
+  flex: 1;
+}
+
+@media (max-width: 767px) {
+  .player-buttons { flex-wrap: wrap; justify-content: center; }
 }
 
 .control-btn {

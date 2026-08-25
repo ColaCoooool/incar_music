@@ -44,15 +44,16 @@
         <span>{{ formatTime(playerStore.duration) }}</span>
       </div>
       <div class="player-buttons">
-        <button class="control-btn" @click="playerStore.prev">⏮</button>
-        <button class="control-btn play" @click="playerStore.togglePlay">
-          {{ playerStore.isPlaying ? '⏸' : '▶️' }}
-        </button>
-        <button class="control-btn" @click="playerStore.next">⏭</button>
-      </div>
-      <div style="display: flex; gap: 12px; justify-content: center; padding-top: 8px;">
-        <button class="btn btn-secondary" @click="shufflePlay">🔀 随机播放</button>
-        <button class="btn btn-secondary" @click="loadAllSongs">📋 加载全部</button>
+        <div class="quick-actions">
+          <button class="quick-btn" @click="shufflePlay" title="随机播放">🔀</button>
+        </div>
+        <div class="transport-controls">
+          <button class="control-btn" @click="playerStore.prev">⏮</button>
+          <button class="control-btn play" @click="playerStore.togglePlay">
+            {{ playerStore.isPlaying ? '⏸' : '▶️' }}
+          </button>
+          <button class="control-btn" @click="playerStore.next">⏭</button>
+        </div>
       </div>
     </div>
   </div>
@@ -76,18 +77,6 @@ function handleSeek(e) {
   const rect = e.currentTarget.getBoundingClientRect()
   const percent = ((e.clientX - rect.left) / rect.width) * 100
   playerStore.seekPercent(percent)
-}
-
-async function loadAllSongs() {
-  try {
-    const resp = await fetch('/api/songs/?page_size=200')
-    const songs = await resp.json()
-    if (songs.length > 0) {
-      playerStore.setPlaylist(songs, 0)
-    }
-  } catch (err) {
-    console.error('Failed to load songs:', err)
-  }
 }
 
 async function shufflePlay() {
