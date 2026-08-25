@@ -518,7 +518,7 @@ body {
   width: 56px;
   height: 56px;
   border: none;
-  background: none;
+  background: var(--bg-hover);
   font-size: 22px;
   cursor: pointer;
   border-radius: 50%;
@@ -529,7 +529,7 @@ body {
 }
 
 .control-btn:hover {
-  background: var(--bg-hover);
+  background: var(--bg-card);
 }
 
 .control-btn.play {
