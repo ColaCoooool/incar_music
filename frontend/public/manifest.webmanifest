@@ -1,0 +1,14 @@
+{
+  "name": "InCar Music",
+  "short_name": "InCarMusic",
+  "description": "车载音乐流媒体",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#101824",
+  "theme_color": "#101824",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
