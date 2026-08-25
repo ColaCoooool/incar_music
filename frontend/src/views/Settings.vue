@@ -60,14 +60,14 @@
         <span class="settings-value">{{ filling ? '处理中...' : '' }}</span>
       </div>
       <div class="settings-item" @click="clearCache">
-        <span class="settings-label">🗑️ 清除缓存</span>
+        <span class="settings-label">🗑️ 清除服务端缓存</span>
         <span class="settings-value">{{ cacheStats.total_size_mb || 0 }}MB</span>
       </div>
     </div>
 
     <!-- Cache Settings -->
     <div class="settings-group">
-      <div class="settings-group-title">💾 缓存设置</div>
+      <div class="settings-group-title">💾 服务端缓存（NAS）</div>
       <div class="settings-item">
         <span class="settings-label">最大缓存</span>
         <span class="settings-value">{{ cacheStats.max_size_mb || 2048 }}MB</span>
@@ -80,6 +80,51 @@
         <span class="settings-label">缓存文件数</span>
         <span class="settings-value">{{ cacheStats.file_count || 0 }}</span>
       </div>
+    </div>
+
+    <!-- Offline cache (browser/device) -->
+    <div class="settings-group">
+      <div class="settings-group-title">📴 离线缓存（本机）</div>
+
+      <div v-if="!cacheSupported" class="offline-cache-note">
+        离线缓存需要 HTTPS 或 localhost 环境，当前环境不可用。<br />
+        通过手机热点 http 访问时，播放过的歌曲不会缓存在本机。
+      </div>
+
+      <template v-else>
+        <div class="settings-item" v-if="offlineStats.loaded">
+          <span class="settings-label">已缓存</span>
+          <span class="settings-value">
+            {{ offlineStats.count }} 首 · {{ offlineStats.usageMb }} MB / {{ offlineStats.quotaMb }} MB（{{ offlineStats.percent }}%）
+          </span>
+        </div>
+
+        <div v-if="offlineSongs.length" class="offline-song-list">
+          <div v-for="item in offlineSongs" :key="item.songId" class="offline-song-item">
+            <img v-if="item.coverUrl" :src="item.coverUrl" class="offline-cover" alt="" />
+            <div v-else class="offline-cover offline-cover-ph">🎵</div>
+            <div class="offline-info">
+              <div class="offline-title">{{ item.title }}</div>
+              <div class="offline-meta">{{ item.artist }}</div>
+            </div>
+            <button class="btn btn-secondary offline-del-btn" @click="removeOffline(item)">删除</button>
+          </div>
+        </div>
+        <div v-else-if="offlineStats.loaded" class="empty-state" style="padding: 24px;">
+          <div class="empty-text">暂无离线缓存，播放过的歌曲会自动加入</div>
+        </div>
+
+        <div style="padding: 0 4px; margin-top: 10px;">
+          <button
+            class="btn btn-secondary"
+            style="width: 100%;"
+            :disabled="!offlineSongs.length"
+            @click="clearOffline"
+          >
+            🗑️ 清空全部离线缓存
+          </button>
+        </div>
+      </template>
     </div>
 
     <!-- Stream Settings -->
@@ -117,6 +162,95 @@ const scrapeResult = ref('')
 const scraping = ref(false)
 const scanning = ref(false)
 const filling = ref(false)
+
+// ─── Offline cache (browser/device) ─────────────────────────────
+// Must match AUDIO_CACHE in public/sw.js
+const AUDIO_CACHE = 'incar-audio-v1'
+const cacheSupported = window.isSecureContext && 'caches' in window
+const offlineStats = ref({ loaded: false, count: 0, usageMb: '0.0', quotaMb: '0', percent: '0' })
+const offlineSongs = ref([])
+
+async function loadOfflineCache() {
+  if (!cacheSupported) return
+  try {
+    const cache = await caches.open(AUDIO_CACHE)
+    const keys = await cache.keys()
+
+    // Map cached song ids to song info (one batch request)
+    const ids = new Set()
+    for (const req of keys) {
+      const m = /\/api\/stream\/(\d+)/.exec(req.url)
+      if (m) ids.add(Number(m[1]))
+    }
+    let idMap = {}
+    try {
+      const resp = await fetch('/api/songs/?page_size=200')
+      const songs = await resp.json()
+      idMap = Object.fromEntries(songs.map((s) => [s.id, s]))
+    } catch (e) {
+      console.error('Failed to load song list for offline cache:', e)
+    }
+
+    const entries = []
+    for (const req of keys) {
+      const m = /\/api\/stream\/(\d+)/.exec(req.url)
+      if (!m) continue
+      const sid = Number(m[1])
+      const song = idMap[sid]
+      entries.push({
+        songId: sid,
+        url: req.url,
+        title: song ? song.title : `歌曲 #${sid}`,
+        artist: song ? song.artist_name : '',
+        coverUrl: song && song.cover_url ? song.cover_url : '',
+      })
+    }
+
+    let usage = 0
+    let quota = 0
+    if ('storage' in navigator && navigator.storage && navigator.storage.estimate) {
+      try {
+        const est = await navigator.storage.estimate()
+        usage = est.usage || 0
+        quota = est.quota || 0
+      } catch (e) { /* ignore */ }
+    }
+
+    offlineSongs.value = entries
+    offlineStats.value = {
+      loaded: true,
+      count: entries.length,
+      usageMb: (usage / 1048576).toFixed(1),
+      quotaMb: Math.round(quota / 1048576),
+      percent: quota ? ((usage / quota) * 100).toFixed(1) : '0',
+    }
+  } catch (e) {
+    console.error('Failed to load offline cache:', e)
+    offlineStats.value.loaded = true
+  }
+}
+
+async function removeOffline(item) {
+  try {
+    const cache = await caches.open(AUDIO_CACHE)
+    await cache.delete(item.url)
+    await loadOfflineCache()
+  } catch (e) {
+    console.error('Failed to remove offline entry:', e)
+  }
+}
+
+async function clearOffline() {
+  if (!window.confirm('清空全部离线缓存？播放过的歌曲将需要重新联网缓存。')) return
+  try {
+    const cache = await caches.open(AUDIO_CACHE)
+    const keys = await cache.keys()
+    await Promise.all(keys.map((k) => cache.delete(k)))
+    await loadOfflineCache()
+  } catch (e) {
+    console.error('Failed to clear offline cache:', e)
+  }
+}
 
 async function loadStats() {
   try {
@@ -181,5 +315,8 @@ async function clearCache() {
   await loadStats()
 }
 
-onMounted(() => loadStats())
+onMounted(() => {
+  loadStats()
+  loadOfflineCache()
+})
 </script>

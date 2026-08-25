@@ -523,6 +523,81 @@ body {
   font-size: 15px;
 }
 
+/* ─── Offline Cache (Settings) ──────────────────────────────── */
+
+.offline-cache-note {
+  padding: 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.offline-song-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.offline-song-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  min-height: 56px;
+}
+
+.offline-song-item:hover {
+  background: var(--bg-hover);
+}
+
+.offline-cover {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.offline-cover-ph {
+  background: var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.offline-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.offline-title {
+  font-size: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.offline-meta {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.offline-del-btn {
+  padding: 8px 14px;
+  min-height: 0;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
 .control-btn {
   width: 56px;
   height: 56px;
