@@ -12,10 +12,23 @@ from models.database import get_db
 from models.song import Song
 from models.artist import Artist
 from models.album import Album
+from models.genre import Genre
 from models.lyrics import Lyrics
 from models.cover import CoverArt
 
 router = APIRouter(prefix="/api/songs", tags=["songs"])
+
+# Columns that may be used for sorting (validated to avoid SQL errors/abuse)
+SORTABLE_COLUMNS = {
+    "title",
+    "play_count",
+    "duration",
+    "date_added",
+    "year",
+    "bitrate",
+    "file_size",
+    "sample_rate",
+}
 
 
 # ─── Schemas ─────────────────────────────────────────────────────────
@@ -101,23 +114,25 @@ async def list_songs(
         selectinload(Song.genre),
     )
 
-    # Filters
+    # Filters (each branch joins at most once to avoid cartesian products)
     if search:
         search_pattern = f"%{search}%"
-        query = query.where(
+        query = query.outerjoin(Song.artist).where(
             or_(
                 Song.title.ilike(search_pattern),
                 Artist.name.ilike(search_pattern),
             )
         )
-    if artist:
-        query = query.join(Artist).where(Artist.name.ilike(f"%{artist}%"))
-    if album:
-        query = query.join(Album).where(Album.title.ilike(f"%{album}%"))
-    if genre:
-        query = query.join(Song.genre).where(Song.genre.has(name=genre))
+    elif artist:
+        query = query.join(Song.artist).where(Artist.name.ilike(f"%{artist}%"))
+    elif album:
+        query = query.join(Song.album).where(Album.title.ilike(f"%{album}%"))
+    elif genre:
+        query = query.join(Song.genre).where(Genre.name == genre)
 
-    # Sorting
+    # Sorting (validated)
+    if sort_by not in SORTABLE_COLUMNS:
+        raise HTTPException(status_code=400, detail=f"Invalid sort_by: {sort_by}")
     sort_column = getattr(Song, sort_by, Song.title)
     if sort_order == "desc":
         query = query.order_by(sort_column.desc())
@@ -202,7 +217,7 @@ async def update_song(
     request: SongUpdateRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    """Update song metadata."""
+    """Update song metadata (title, artist, album, genre, year)."""
     result = await db.execute(
         select(Song)
         .options(selectinload(Song.artist), selectinload(Song.album), selectinload(Song.genre))
@@ -214,7 +229,58 @@ async def update_song(
 
     if request.title is not None:
         song.title = request.title
+    if request.year is not None:
+        song.year = request.year
 
+    if request.artist_name is not None:
+        if request.artist_name:
+            artist = (
+                await db.execute(select(Artist).where(Artist.name == request.artist_name))
+            ).scalar_one_or_none()
+            if not artist:
+                artist = Artist(name=request.artist_name)
+                db.add(artist)
+                await db.flush()
+            song.artist_id = artist.id
+        else:
+            song.artist_id = None
+
+    if request.album_title is not None:
+        if request.album_title:
+            album = (
+                await db.execute(
+                    select(Album).where(
+                        Album.title == request.album_title,
+                        Album.artist_id == (song.artist_id or 0),
+                    )
+                )
+            ).scalar_one_or_none()
+            if not album:
+                album = Album(
+                    title=request.album_title,
+                    artist_id=song.artist_id or 0,
+                    year=request.year or song.year or 0,
+                )
+                db.add(album)
+                await db.flush()
+            song.album_id = album.id
+        else:
+            song.album_id = None
+
+    if request.genre_name is not None:
+        if request.genre_name:
+            genre = (
+                await db.execute(select(Genre).where(Genre.name == request.genre_name))
+            ).scalar_one_or_none()
+            if not genre:
+                genre = Genre(name=request.genre_name)
+                db.add(genre)
+                await db.flush()
+            song.genre_id = genre.id
+        else:
+            song.genre_id = None
+
+    song.metadata_complete = bool(song.artist_id and song.album_id)
     await db.commit()
     await db.refresh(song)
     return _song_to_response(song)
@@ -222,11 +288,21 @@ async def update_song(
 
 @router.delete("/{song_id}")
 async def delete_song(song_id: int, db: AsyncSession = Depends(get_db)):
-    """Delete a song from the database (not from disk)."""
+    """Delete a song from the database (not from disk), cascading related rows."""
     result = await db.execute(select(Song).where(Song.id == song_id))
     song = result.scalar_one_or_none()
     if not song:
         raise HTTPException(status_code=404, detail="Song not found")
+
+    # Explicitly delete related rows (lyrics, cover, playlist entries)
+    from models.cover import CoverArt
+    from models.lyrics import Lyrics
+    from models.playlist import PlaylistSong
+
+    for model in (Lyrics, CoverArt, PlaylistSong):
+        related = await db.execute(select(model).where(model.song_id == song_id))
+        for row in related.scalars().all():
+            await db.delete(row)
 
     await db.delete(song)
     await db.commit()

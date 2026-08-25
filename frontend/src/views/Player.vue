@@ -84,7 +84,7 @@ function handleSeek(e) {
 
 async function loadAllSongs() {
   try {
-    const resp = await fetch('/api/songs/?page_size=500')
+    const resp = await fetch('/api/songs/?page_size=200')
     const songs = await resp.json()
     if (songs.length > 0) {
       playerStore.setPlaylist(songs, 0)
@@ -96,7 +96,7 @@ async function loadAllSongs() {
 
 async function shufflePlay() {
   try {
-    const resp = await fetch('/api/songs/?page_size=500&sort_by=play_count&sort_order=desc')
+    const resp = await fetch('/api/songs/?page_size=200&sort_by=play_count&sort_order=desc')
     const songs = await resp.json()
     // Shuffle
     for (let i = songs.length - 1; i > 0; i--) {

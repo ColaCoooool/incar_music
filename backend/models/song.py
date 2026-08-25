@@ -38,6 +38,9 @@ class Song(Base):
     disc_number: Mapped[Optional[int]] = mapped_column(Integer)
     comment: Mapped[Optional[str]] = mapped_column(Text)
 
+    # Source (scraped songs)
+    source_url: Mapped[Optional[str]] = mapped_column(String(2000))
+
     # Status
     has_lyrics: Mapped[bool] = mapped_column(default=False)
     has_cover: Mapped[bool] = mapped_column(default=False)

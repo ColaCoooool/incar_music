@@ -140,15 +140,29 @@ class MetadataFetcher:
             # Determine if synced (has timestamps)
             is_synced = bool(re.search(r"\[\d{2}:\d{2}\.\d{2,3}\]", lrc))
 
-            lyrics = Lyrics(
-                song_id=song.id,
-                content=lrc,
-                format="lrc",
-                language="zh",
-                is_synced=is_synced,
-                source="netease" if not lrc.startswith("[") else "qq",
-            )
-            self.db.add(lyrics)
+            # Update the existing lyrics row if present (song_id is unique)
+            existing = (
+                await self.db.execute(
+                    select(Lyrics).where(Lyrics.song_id == song.id)
+                )
+            ).scalar_one_or_none()
+
+            if existing:
+                existing.content = lrc
+                existing.format = "lrc"
+                existing.language = "zh"
+                existing.is_synced = is_synced
+                existing.source = "netease" if not lrc.startswith("[") else "qq"
+            else:
+                lyrics = Lyrics(
+                    song_id=song.id,
+                    content=lrc,
+                    format="lrc",
+                    language="zh",
+                    is_synced=is_synced,
+                    source="netease" if not lrc.startswith("[") else "qq",
+                )
+                self.db.add(lyrics)
             song.has_lyrics = True
             await self.db.flush()
             return lrc
@@ -256,6 +270,7 @@ class MetadataFetcher:
                 cover_path.write_bytes(resp.content)
 
                 # Resize if too large
+                img = None
                 try:
                     img = Image.open(cover_path)
                     if max(img.size) > settings.COVER_MAX_SIZE:

@@ -1,5 +1,7 @@
 """Streaming API routes."""
 
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import select
@@ -11,6 +13,9 @@ from services import streamer
 from services.smart_cache import smart_cache
 
 router = APIRouter(prefix="/api/stream", tags=["streaming"])
+
+# HLS segments must be plain segment files, never path components
+_SEGMENT_NAME_RE = re.compile(r"^segment_\d{4}\.aac$")
 
 
 @router.get("/{song_id}")
@@ -87,6 +92,9 @@ async def get_hls_segment(
     bitrate: int = Query(192, ge=32, le=320),
 ):
     """Get an HLS segment file."""
+    if not _SEGMENT_NAME_RE.match(segment):
+        raise HTTPException(status_code=400, detail="Invalid segment name")
+
     from core.config import settings
     segment_path = settings.hls_path / f"song_{song_id}" / f"br_{bitrate}" / segment
 

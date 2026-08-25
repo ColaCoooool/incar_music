@@ -17,7 +17,7 @@ def extract_douyin_id(url: str) -> Optional[str]:
     patterns = [
         r"douyin\.com/video/(\d+)",
         r"douyin\.com/note/(\d+)",
-        r"v\.douyin\.com/[\w]+",
+        r"v\.douyin\.com/([\w]+)",
         r"(?<!\w)(\d{19,})(?!\w)",
     ]
     for pattern in patterns:

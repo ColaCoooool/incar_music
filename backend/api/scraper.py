@@ -53,7 +53,7 @@ async def scrape_bilibili(
 
         # Prepare output path
         title = _sanitize_filename(info["title"])
-        output_dir = settings.MUSIC_LIBRARY_PATH / "_scraped" / "bilibili"
+        output_dir = Path(settings.MUSIC_LIBRARY_PATH) / "_scraped" / "bilibili"
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = str(output_dir / title)
 

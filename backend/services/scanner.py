@@ -26,9 +26,42 @@ logger = logging.getLogger(__name__)
 
 SUPPORTED_FORMATS = {".mp3", ".flac", ".wav", ".aac", ".ogg", ".wma", ".m4a", ".ape", ".opus"}
 
+# Formats whose easy-tag keys differ from the mutagen easy names.
+# Easy formats (mp3/flac/ogg/...) expose "title"/"artist"/...;
+# WAVE exposes ID3 frame names (TIT2/TPE1/...).
+_TAG_KEY_CANDIDATES = {
+    "title": ("title", "TIT2"),
+    "artist": ("artist", "TPE1"),
+    "album": ("album", "TALB"),
+    "genre": ("genre", "TCON"),
+    "date": ("date", "TDRC"),
+    "tracknumber": ("tracknumber", "TRCK"),
+    "discnumber": ("discnumber", "TPOS"),
+    "comment": ("comment", "COMM"),
+}
 
-def extract_metadata(file_path: Path) -> dict:
-    """Extract metadata from an audio file using mutagen."""
+
+def _get_tag(audio, candidates) -> str:
+    """Read a tag by any of the candidate keys, handling easy tags and ID3 frames."""
+    for key in candidates:
+        try:
+            v = audio[key]
+        except (KeyError, TypeError):
+            continue
+        if hasattr(v, "text") and v.text:  # ID3 frame object
+            return str(v.text[0])
+        if isinstance(v, (list, tuple)) and v:
+            return str(v[0])
+        if isinstance(v, str) and v:
+            return v
+    return ""
+
+
+def extract_metadata(file_path: Path) -> Optional[dict]:
+    """Extract metadata from an audio file using mutagen.
+
+    Returns None when the file is not a parseable audio file.
+    """
     meta = {
         "title": file_path.stem,
         "artist": "",
@@ -49,7 +82,7 @@ def extract_metadata(file_path: Path) -> dict:
     try:
         audio = MutagenFile(str(file_path), easy=True)
         if audio is None:
-            return meta
+            return None
 
         # Duration and audio properties
         if hasattr(audio.info, "length"):
@@ -61,15 +94,15 @@ def extract_metadata(file_path: Path) -> dict:
         if hasattr(audio.info, "channels"):
             meta["channels"] = audio.info.channels
 
-        # Tags
-        meta["title"] = audio.get("title", [file_path.stem])[0]
-        meta["artist"] = audio.get("artist", [""])[0]
-        meta["album"] = audio.get("album", [""])[0]
-        meta["genre"] = audio.get("genre", [""])[0]
-        meta["comment"] = audio.get("comment", [""])[0]
+        # Tags (works for both easy-tag formats and WAVE's ID3 frames)
+        meta["title"] = _get_tag(audio, _TAG_KEY_CANDIDATES["title"]) or file_path.stem
+        meta["artist"] = _get_tag(audio, _TAG_KEY_CANDIDATES["artist"])
+        meta["album"] = _get_tag(audio, _TAG_KEY_CANDIDATES["album"])
+        meta["genre"] = _get_tag(audio, _TAG_KEY_CANDIDATES["genre"])
+        meta["comment"] = _get_tag(audio, _TAG_KEY_CANDIDATES["comment"])
 
         # Year
-        date_str = audio.get("date", [""])[0]
+        date_str = _get_tag(audio, _TAG_KEY_CANDIDATES["date"])
         if date_str:
             try:
                 meta["year"] = int(date_str[:4])
@@ -77,7 +110,7 @@ def extract_metadata(file_path: Path) -> dict:
                 pass
 
         # Track number
-        track_str = audio.get("tracknumber", [""])[0]
+        track_str = _get_tag(audio, _TAG_KEY_CANDIDATES["tracknumber"])
         if track_str:
             try:
                 meta["track_number"] = int(track_str.split("/")[0])
@@ -85,7 +118,7 @@ def extract_metadata(file_path: Path) -> dict:
                 pass
 
         # Disc number
-        disc_str = audio.get("discnumber", [""])[0]
+        disc_str = _get_tag(audio, _TAG_KEY_CANDIDATES["discnumber"])
         if disc_str:
             try:
                 meta["disc_number"] = int(disc_str.split("/")[0])
@@ -94,6 +127,7 @@ def extract_metadata(file_path: Path) -> dict:
 
     except Exception as e:
         logger.warning(f"Failed to extract metadata from {file_path}: {e}")
+        return None
 
     return meta
 
@@ -105,6 +139,48 @@ def file_hash(file_path: Path) -> str:
     except ValueError:
         rel = file_path
     return hashlib.md5(str(rel).encode()).hexdigest()
+
+
+async def _get_or_create_artist(db: AsyncSession, name: str) -> Optional[int]:
+    result = await db.execute(select(Artist).where(Artist.name == name))
+    artist = result.scalar_one_or_none()
+    if not artist:
+        artist = Artist(name=name)
+        db.add(artist)
+        await db.flush()
+    return artist.id
+
+
+async def _get_or_create_album(
+    db: AsyncSession, title: str, artist_id: Optional[int], year: Optional[int]
+) -> Optional[int]:
+    # Albums are scoped by (title, artist) so same-named albums by different
+    # artists are kept apart.
+    result = await db.execute(
+        select(Album).where(
+            Album.title == title, Album.artist_id == (artist_id or 0)
+        )
+    )
+    album = result.scalar_one_or_none()
+    if not album:
+        album = Album(
+            title=title,
+            artist_id=artist_id or 0,
+            year=year or 0,
+        )
+        db.add(album)
+        await db.flush()
+    return album.id
+
+
+async def _get_or_create_genre(db: AsyncSession, name: str) -> Optional[int]:
+    result = await db.execute(select(Genre).where(Genre.name == name))
+    genre = result.scalar_one_or_none()
+    if not genre:
+        genre = Genre(name=name)
+        db.add(genre)
+        await db.flush()
+    return genre.id
 
 
 async def scan_library(db: AsyncSession, force: bool = False) -> dict:
@@ -133,59 +209,22 @@ async def scan_library(db: AsyncSession, force: bool = False) -> dict:
             file_path_str = str(file_path)
 
             try:
-                # Check if already in database
                 if file_path_str in existing_paths and not force:
                     stats["skipped"] += 1
                     continue
 
-                # Extract metadata
+                # Extract metadata (None => unparseable file, skip it)
                 meta = extract_metadata(file_path)
+                if meta is None:
+                    stats["skipped"] += 1
+                    continue
 
-                # Get or create artist
-                artist_id = None
-                if meta["artist"]:
-                    artist_result = await db.execute(
-                        select(Artist).where(Artist.name == meta["artist"])
-                    )
-                    artist = artist_result.scalar_one_or_none()
-                    if not artist:
-                        artist = Artist(name=meta["artist"])
-                        db.add(artist)
-                        await db.flush()
-                    artist_id = artist.id
+                # Get or create artist / album / genre
+                artist_id = await _get_or_create_artist(db, meta["artist"]) if meta["artist"] else None
+                album_id = await _get_or_create_album(db, meta["album"], artist_id, meta["year"]) if meta["album"] else None
+                genre_id = await _get_or_create_genre(db, meta["genre"]) if meta["genre"] else None
 
-                # Get or create album
-                album_id = None
-                if meta["album"]:
-                    album_result = await db.execute(
-                        select(Album).where(Album.title == meta["album"])
-                    )
-                    album = album_result.scalar_one_or_none()
-                    if not album:
-                        album = Album(
-                            title=meta["album"],
-                            artist_id=artist_id or 0,
-                            year=meta["year"] or 0,
-                        )
-                        db.add(album)
-                        await db.flush()
-                    album_id = album.id
-
-                # Get or create genre
-                genre_id = None
-                if meta["genre"]:
-                    genre_result = await db.execute(
-                        select(Genre).where(Genre.name == meta["genre"])
-                    )
-                    genre = genre_result.scalar_one_or_none()
-                    if not genre:
-                        genre = Genre(name=meta["genre"])
-                        db.add(genre)
-                        await db.flush()
-                    genre_id = genre.id
-
-                # Create song
-                song = Song(
+                song_data = dict(
                     title=meta["title"],
                     file_path=file_path_str,
                     relative_path=str(file_path.relative_to(library_path)),
@@ -202,14 +241,23 @@ async def scan_library(db: AsyncSession, force: bool = False) -> dict:
                     artist_id=artist_id,
                     album_id=album_id,
                     genre_id=genre_id,
-                    has_lyrics=False,
-                    has_cover=False,
                     metadata_complete=bool(meta["artist"] and meta["album"]),
                 )
-                db.add(song)
-                stats["added"] += 1
 
-                if stats["added"] % 100 == 0:
+                if file_path_str in existing_paths:
+                    # force: update the existing song in place
+                    song = (
+                        await db.execute(select(Song).where(Song.file_path == file_path_str))
+                    ).scalar_one()
+                    for field, value in song_data.items():
+                        setattr(song, field, value)
+                    stats["updated"] += 1
+                else:
+                    song = Song(**song_data)
+                    db.add(song)
+                    stats["added"] += 1
+
+                if stats["added"] % 100 == 0 and stats["added"] > 0:
                     await db.flush()
                     logger.info(f"Scan progress: {stats['added']} songs added")
 

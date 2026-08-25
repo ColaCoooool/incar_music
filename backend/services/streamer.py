@@ -104,9 +104,13 @@ async def create_hls_stream(
     if playlist_path.exists():
         return str(playlist_path)
 
-    # Get audio duration
+    # Get audio duration (ffprobe reports it as a string)
     info = await get_audio_info(file_path)
-    duration = info.get("format", {}).get("duration", 0)
+    duration_raw = info.get("format", {}).get("duration", 0)
+    try:
+        duration = float(duration_raw)
+    except (TypeError, ValueError):
+        duration = 0
     if not duration:
         return None
 

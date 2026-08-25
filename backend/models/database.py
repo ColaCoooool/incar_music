@@ -33,6 +33,20 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db():
-    """Create all tables."""
+    """Create all tables and apply lightweight migrations."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_migrate)
+
+
+def _migrate(sync_conn):
+    """Add columns introduced after the initial release (SQLite-safe)."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(sync_conn)
+    if "songs" in inspector.get_table_names():
+        cols = {c["name"] for c in inspector.get_columns("songs")}
+        if "source_url" not in cols:
+            sync_conn.execute(
+                text("ALTER TABLE songs ADD COLUMN source_url VARCHAR(2000)")
+            )
