@@ -419,8 +419,10 @@ body {
 
 /* ─── Library / Song List ───────────────────────────────────── */
 
+/* ─── Header / Search / Tabs ───────────────────────────────── */
+
 .view-header {
-  padding: 20px 16px 12px;
+  padding: 20px 20px 14px;
   position: sticky;
   top: 0;
   background: var(--bg-primary);
@@ -439,12 +441,12 @@ body {
 
 .search-bar input {
   width: 100%;
-  padding: 10px 16px 10px 40px;
+  padding: 12px 16px 12px 42px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 17px;
   outline: none;
 }
 
@@ -454,10 +456,10 @@ body {
 
 .search-bar .search-icon {
   position: absolute;
-  left: 12px;
+  left: 14px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .song-list {
@@ -467,10 +469,17 @@ body {
 .song-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border);
+  gap: 14px;
+  padding: 12px 14px;
+  min-height: var(--touch-min);
+  border-bottom: none;
+  margin-bottom: 4px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
+}
+
+.song-item:hover {
+  background: var(--bg-hover);
 }
 
 .song-item:active {
@@ -478,9 +487,9 @@ body {
 }
 
 .song-cover-small {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
   object-fit: cover;
   flex-shrink: 0;
 }
@@ -490,7 +499,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 22px;
   flex-shrink: 0;
 }
 
@@ -500,15 +509,15 @@ body {
 }
 
 .song-title {
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 18px;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .song-meta {
-  font-size: 12px;
+  font-size: 15px;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -517,8 +526,8 @@ body {
 }
 
 .song-duration {
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-size: 14px;
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 
@@ -526,9 +535,9 @@ body {
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 16px;
-  padding: 0 16px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 18px;
+  padding: 0 20px;
 }
 
 .grid-item {
@@ -557,7 +566,7 @@ body {
 }
 
 .grid-title {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -565,7 +574,7 @@ body {
 }
 
 .grid-subtitle {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 
@@ -579,8 +588,8 @@ body {
 }
 
 .tab {
-  padding: 12px 16px;
-  font-size: 14px;
+  padding: 14px 18px;
+  font-size: 18px;
   color: var(--text-secondary);
   border-bottom: 2px solid transparent;
   cursor: pointer;
@@ -595,10 +604,10 @@ body {
 /* ─── Buttons ───────────────────────────────────────────────── */
 
 .btn {
-  padding: 10px 20px;
+  padding: 14px 24px;
   border: none;
   border-radius: var(--radius);
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
@@ -654,7 +663,7 @@ body {
 }
 
 .settings-group-title {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-secondary);
   text-transform: uppercase;
   margin-bottom: 12px;
@@ -665,16 +674,16 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 0;
+  padding: 14px 4px;
   border-bottom: 1px solid var(--border);
 }
 
 .settings-label {
-  font-size: 15px;
+  font-size: 17px;
 }
 
 .settings-value {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-secondary);
 }
 
@@ -695,13 +704,13 @@ body {
 }
 
 .stat-value {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 600;
   color: var(--accent);
 }
 
 .stat-label {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-secondary);
   margin-top: 4px;
 }
@@ -729,7 +738,7 @@ body {
 
 /* Playlist picker (Library) */
 .song-actions { position: relative; }
-.add-to-playlist-btn { padding: 4px 10px; margin-left: 6px; }
+.add-to-playlist-btn { padding: 10px 16px; font-size: 18px; margin-left: 10px; }
 .playlist-picker {
   position: absolute; right: 0; top: 110%;
   background: var(--bg-card); border: 1px solid var(--border);

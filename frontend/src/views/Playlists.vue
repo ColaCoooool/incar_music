@@ -6,7 +6,7 @@
 
     <!-- Detail view -->
     <template v-if="editingPlaylist">
-      <button class="btn btn-secondary" style="margin: 0 4px 8px;" @click="backToList">← 返回</button>
+      <button class="btn btn-secondary" style="margin: 0 4px 8px;" @click="backToList">�?返回</button>
       <div class="settings-group">
         <div class="settings-group-title">{{ editingPlaylist.name }}（{{ editingPlaylist.song_count }} 首）</div>
         <div v-if="playlistSongs.length" class="song-list">
@@ -16,7 +16,7 @@
               <div class="song-title">{{ song.title }}</div>
               <div class="song-meta">{{ song.artist_name }}</div>
             </div>
-            <button class="btn btn-secondary" style="padding: 4px 10px;" @click.stop="removeSong(song.id)">移除</button>
+            <button class="btn btn-secondary"  @click.stop="removeSong(song.id)">移除</button>
           </div>
         </div>
         <div v-else class="empty-state" style="padding: 24px;">歌单为空</div>
@@ -48,8 +48,8 @@
               <div class="song-title">{{ pl.name }}</div>
               <div class="song-meta">{{ pl.song_count }} 首歌</div>
             </div>
-            <button class="btn btn-secondary" style="padding: 4px 10px;" @click.stop="renamePlaylist(pl)">改名</button>
-            <button class="btn btn-secondary" style="padding: 4px 10px; margin-left: 4px;" @click.stop="deletePlaylist(pl)">删除</button>
+            <button class="btn btn-secondary"  @click.stop="renamePlaylist(pl)">改名</button>
+            <button class="btn btn-secondary" style="margin-left: 4px;" @click.stop="deletePlaylist(pl)">删除</button>
           </div>
         </div>
         <div v-else class="empty-state" style="padding: 40px 20px;">
@@ -128,7 +128,7 @@ async function renamePlaylist(pl) {
 }
 
 async function deletePlaylist(pl) {
-  if (!window.confirm(`删除歌单「${pl.name}」？`)) return
+  if (!window.confirm(`删除歌单�?{pl.name}」？`)) return
   try {
     await fetch(`/api/playlists/${pl.id}`, { method: 'DELETE' })
     await loadPlaylists()
