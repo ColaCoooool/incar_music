@@ -3,7 +3,7 @@
 import re
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +15,45 @@ from scrapers.bilibili import BilibiliScraper, extract_bvid
 from scrapers.douyin import extract_douyin_id
 
 router = APIRouter(prefix="/api/scraper", tags=["scraper"])
+
+MAX_COOKIES_SIZE = 1024 * 1024  # 1 MB
+
+
+def _cookies_target_path() -> Path:
+    """Where uploaded cookies are stored (and later read by yt-dlp)."""
+    if settings.YTDLP_COOKIES_FILE:
+        return Path(settings.YTDLP_COOKIES_FILE)
+    return settings.data_dir / "cookies.txt"
+
+
+@router.post("/cookies")
+async def upload_cookies(file: UploadFile = File(...)):
+    """Upload a Netscape-format cookies file for yt-dlp (e.g. Douyin)."""
+    content = await file.read()
+    if len(content) > MAX_COOKIES_SIZE:
+        raise HTTPException(status_code=400, detail="Cookies file too large (max 1MB)")
+    if not content.strip():
+        raise HTTPException(status_code=400, detail="Cookies file is empty")
+
+    path = _cookies_target_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(content)
+    return {"configured": True, "path": str(path)}
+
+
+@router.get("/cookies")
+async def get_cookies_status():
+    """Report whether a cookies file is configured for yt-dlp."""
+    return {"configured": ytdlp.cookies_file_path() is not None}
+
+
+@router.delete("/cookies")
+async def delete_cookies():
+    """Remove the uploaded cookies file."""
+    path = _cookies_target_path()
+    if path.exists():
+        path.unlink()
+    return {"configured": False}
 
 
 class ScrapeRequest(BaseModel):

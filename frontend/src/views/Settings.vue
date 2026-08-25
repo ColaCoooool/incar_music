@@ -48,6 +48,49 @@
       </div>
     </div>
 
+    <!-- Douyin cookies -->
+    <div class="settings-group">
+      <div class="settings-group-title">🍪 抖音 Cookies</div>
+      <div class="settings-item">
+        <span class="settings-label">状态</span>
+        <span class="settings-value" :style="cookieStatus && cookieStatus.configured ? 'color: var(--accent);' : ''">
+          {{ cookieStatus ? (cookieStatus.configured ? '✅ 已配置' : '未配置') : '...' }}
+        </span>
+      </div>
+      <div style="padding: 0 4px;">
+        <input
+          ref="cookieInput"
+          type="file"
+          accept=".txt"
+          style="width: 100%; color: var(--text-primary); font-size: 14px;"
+          @change="onCookieFile"
+        />
+        <button
+          class="btn btn-primary"
+          style="width: 100%; margin-top: 8px;"
+          :disabled="!cookieFile"
+          @click="uploadCookies"
+        >
+          📤 上传 cookies.txt
+        </button>
+        <button
+          v-if="cookieStatus && cookieStatus.configured"
+          class="btn btn-secondary"
+          style="width: 100%; margin-top: 8px;"
+          @click="removeCookies"
+        >
+          🗑️ 删除 cookies
+        </button>
+        <div style="margin-top: 10px; font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
+          抖音反爬需要新鲜 cookies：电脑浏览器登录抖音 → 安装「Get cookies.txt」扩展导出 cookies.txt → 上传。
+          文件保存在服务器（NAS），抖音爬取时自动使用。B 站爬取无需 cookies。
+        </div>
+        <div v-if="cookieMsg" style="margin-top: 8px; font-size: 13px;" :style="cookieMsgOk ? 'color: var(--accent);' : 'color: var(--danger);'">
+          {{ cookieMsg }}
+        </div>
+      </div>
+    </div>
+
     <!-- Library Management -->
     <div class="settings-group">
       <div class="settings-group-title">📚 库管理</div>
@@ -162,6 +205,63 @@ const scrapeResult = ref('')
 const scraping = ref(false)
 const scanning = ref(false)
 const filling = ref(false)
+const cookieStatus = ref(null)
+const cookieFile = ref(null)
+const cookieMsg = ref('')
+const cookieMsgOk = ref(true)
+const cookieInput = ref(null)
+
+// ─── Douyin cookies ─────────────────────────────────────────────
+
+async function loadCookieStatus() {
+  try {
+    const r = await fetch('/api/scraper/cookies')
+    cookieStatus.value = await r.json()
+  } catch (e) {
+    console.error('Failed to load cookie status:', e)
+    cookieStatus.value = null
+  }
+}
+
+function onCookieFile(e) {
+  cookieFile.value = e.target.files[0] || null
+}
+
+async function uploadCookies() {
+  if (!cookieFile.value) return
+  const fd = new FormData()
+  fd.append('file', cookieFile.value)
+  try {
+    const r = await fetch('/api/scraper/cookies', { method: 'POST', body: fd })
+    const data = await r.json()
+    if (r.ok) {
+      cookieMsg.value = 'cookies 已保存，抖音爬取将自动使用'
+      cookieMsgOk.value = true
+      cookieFile.value = null
+      if (cookieInput.value) cookieInput.value.value = ''
+      await loadCookieStatus()
+    } else {
+      cookieMsg.value = `❌ ${data.detail || '上传失败'}`
+      cookieMsgOk.value = false
+    }
+  } catch (e) {
+    cookieMsg.value = '❌ 网络错误'
+    cookieMsgOk.value = false
+  }
+}
+
+async function removeCookies() {
+  if (!window.confirm('删除已保存的抖音 cookies？')) return
+  try {
+    await fetch('/api/scraper/cookies', { method: 'DELETE' })
+    cookieMsg.value = 'cookies 已删除'
+    cookieMsgOk.value = true
+    await loadCookieStatus()
+  } catch (e) {
+    cookieMsg.value = '❌ 删除失败'
+    cookieMsgOk.value = false
+  }
+}
 
 // ─── Offline cache (browser/device) ─────────────────────────────
 // Must match AUDIO_CACHE in public/sw.js
@@ -318,5 +418,6 @@ async function clearCache() {
 onMounted(() => {
   loadStats()
   loadOfflineCache()
+  loadCookieStatus()
 })
 </script>

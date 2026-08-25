@@ -18,9 +18,23 @@ logger = logging.getLogger(__name__)
 _FORMAT_SELECTION = "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best"
 
 
-def _ydl_opts(output_dir: Path) -> dict:
+def cookies_file_path() -> Optional[Path]:
+    """Resolve the cookies file used by yt-dlp.
+
+    Priority: YTDLP_COOKIES_FILE env/config, else the uploaded file at
+    <data_dir>/cookies.txt. Returns None when neither exists.
+    """
     from core.config import settings
 
+    if settings.YTDLP_COOKIES_FILE:
+        p = Path(settings.YTDLP_COOKIES_FILE)
+        if p.exists():
+            return p
+    default = settings.data_dir / "cookies.txt"
+    return default if default.exists() else None
+
+
+def _ydl_opts(output_dir: Path) -> dict:
     opts = {
         "format": _FORMAT_SELECTION,
         "outtmpl": str(output_dir / "%(title).120B.%(ext)s"),
@@ -31,8 +45,9 @@ def _ydl_opts(output_dir: Path) -> dict:
         "socket_timeout": 30,
         "retries": 2,
     }
-    if settings.YTDLP_COOKIES_FILE and Path(settings.YTDLP_COOKIES_FILE).exists():
-        opts["cookiefile"] = settings.YTDLP_COOKIES_FILE
+    cookies = cookies_file_path()
+    if cookies:
+        opts["cookiefile"] = str(cookies)
     return opts
 
 
