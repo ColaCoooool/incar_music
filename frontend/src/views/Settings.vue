@@ -375,12 +375,12 @@ async function scrapeUrl_() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: scrapeUrl.value }),
     })
-    const data = await resp.json()
-    if (resp.ok) {
+    const data = await resp.json().catch(() => null)
+    if (resp.ok && data) {
       scrapeResult.value = `${data.title} - ${data.artist}`
       scrapeUrl.value = ''
     } else {
-      scrapeResult.value = `❌ ${data.detail || '爬取失败'}`
+      scrapeResult.value = `❌ ${data?.detail || `服务器错误 HTTP ${resp.status}，请查看后端日志`}`
     }
   } catch (err) {
     scrapeResult.value = '❌ 网络错误'

@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "backend/**"
+      - "frontend/**"
       - "Dockerfile"
       - ".dockerignore"
       - ".github/workflows/build-backend-image.yml"
