@@ -44,4 +44,5 @@ docker-compose.override.yml
 test_music/
 test_music_pytest/
 
-# Brainstorm visual companion sessions.superpowers/
+# Brainstorm visual companion sessions
+.superpowers/
