@@ -34,6 +34,34 @@ def test_scan_populates_artist_album_genre(client, music_library):
     assert by_title["Rolling in the Deep"]["genre_name"] == "Pop"
 
 
+def test_scan_supports_python311_without_path_walk(client, music_library, monkeypatch):
+    """Regression: scan must run on Python 3.11, where Path.walk() does not exist.
+
+    The container image uses python:3.11-slim; Path.walk was added in 3.12 and
+    crashes the scan with AttributeError: 'PosixPath' object has no attribute 'walk'.
+    """
+    from pathlib import Path as PathCls
+
+    # Simulate the Python 3.11 runtime where Path.walk is absent.
+    monkeypatch.delattr(PathCls, "walk", raising=False)
+
+    r = scan(client)
+    assert r.status_code == 200, r.text
+    assert client.get("/api/library/stats").json()["total_songs"] == 5
+
+
+def test_scan_finds_music_in_nested_subdirectories(client, music_library):
+    """Music scattered across subfolders (not only the library root) must be discovered."""
+    r = scan(client)
+    assert r.status_code == 200, r.text
+
+    songs = client.get("/api/songs/").json()
+    by_title = {s["title"]: s["file_path"] for s in songs}
+
+    assert "依然范特西" in by_title["夜的第七章"]
+    assert "21" in by_title["Rolling in the Deep"]
+
+
 def test_garbage_file_skipped(client, music_library):
     """Unparseable audio files must not be added to the library."""
     scan(client)

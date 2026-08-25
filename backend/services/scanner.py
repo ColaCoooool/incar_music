@@ -6,6 +6,7 @@ and stores it in the database.
 
 import hashlib
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -200,7 +201,7 @@ async def scan_library(db: AsyncSession, force: bool = False) -> dict:
     existing_paths = {row[0] for row in result.all()}
 
     # Walk through all audio files
-    for root, _, files in library_path.walk():
+    for root, _, files in os.walk(library_path):
         for filename in files:
             file_path = Path(root) / filename
             if file_path.suffix.lower() not in SUPPORTED_FORMATS:
