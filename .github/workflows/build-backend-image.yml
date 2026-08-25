@@ -42,5 +42,5 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            ghcr.io/${{ github.repository }}/backend:latest
-            ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+            ghcr.io/colacoooool/incar_music/backend:latest
+            ghcr.io/colacoooool/incar_music/backend:${{ github.sha }}
