@@ -91,7 +91,14 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
+  function isEditableTarget(e) {
+    const t = e.target
+    return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
+  }
+
   function onMediaKey(e) {
+    // Never hijack keys while typing in a search/input field
+    if (isEditableTarget(e)) return
     switch (e.key) {
       case 'MediaTrackNext':
         e.preventDefault()
@@ -102,6 +109,10 @@ export const usePlayerStore = defineStore('player', () => {
         prev()
         break
       case 'MediaPlayPause':
+        e.preventDefault()
+        togglePlay()
+        break
+      case ' ': // spacebar fallback (some car browsers map play/pause to space)
         e.preventDefault()
         togglePlay()
         break
