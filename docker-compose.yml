@@ -1,16 +1,15 @@
-
 services:
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/colacoooool/incar_music/backend:latest
     container_name: incar-music-backend
     restart: unless-stopped
     volumes:
       # 绿联 NAS 音乐目录
       - /volume1/音乐:/music:ro
-      # 持久化数�?
+      # 持久化数据
       - incar-data:/app/data
+      # 代码映射：改代码只需替换 NAS 上的 backend 文件夹并重启容器，无需重新构建镜像
+      - /volume1/docker/incar_music/backend:/app
     environment:
       - MUSIC_LIBRARY_PATH=/music
       - DATABASE_URL=sqlite+aiosqlite:///./data/incar_music.db
@@ -25,9 +24,7 @@ services:
       retries: 3
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: ghcr.io/colacoooool/incar_music/frontend:latest
     container_name: incar-music-frontend
     restart: unless-stopped
     ports:
