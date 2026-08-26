@@ -8,8 +8,6 @@ services:
       - /volume1/音乐:/music:ro
       # 持久化数据
       - incar-data:/app/data
-      # 代码映射：改代码只需替换 NAS 上的 backend 文件夹并重启容器，无需重新构建镜像
-      - /volume1/docker/incar_music/backend:/app
     environment:
       - MUSIC_LIBRARY_PATH=/music
       - DATABASE_URL=sqlite+aiosqlite:///./data/incar_music.db
