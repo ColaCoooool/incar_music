@@ -1,6 +1,7 @@
 """Streaming API routes."""
 
 import re
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
@@ -51,6 +52,15 @@ async def stream_song(
         "wma": "audio/x-ms-wma",
     }
     content_type = content_types.get(ext, "audio/mpeg")
+
+    # Browsers cannot decode some codecs (e.g. ALAC in .m4a); serve a
+    # transcoded AAC copy instead of the raw file.
+    if Path(file_path).suffix.lower() in {".m4a", ".mp4", ".wma", ".ape"} and await streamer.needs_browser_transcode(file_path):
+        transcoded = await streamer.transcode_for_browser(file_path, song_id)
+        if transcoded:
+            file_path = transcoded
+            ext = "m4a"
+            content_type = "audio/mp4"
 
     return FileResponse(
         path=file_path,

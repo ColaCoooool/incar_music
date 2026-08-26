@@ -21,6 +21,87 @@ def is_ffmpeg_available() -> bool:
     return shutil.which("ffmpeg") is not None
 
 
+# Audio codecs browsers cannot decode natively in direct playback.
+_BROWSER_UNSUPPORTED_CODECS = {
+    "alac",  # Apple Lossless in .m4a
+    "ape",  # Monkey's Audio
+    "wmav1",
+    "wmav2",
+    "wmapro",
+    "wmalossless",
+}
+
+
+def needs_browser_transcode(file_path: str) -> bool:
+    """Return True when the file's codec cannot be decoded by browsers.
+
+    Typical case: .m4a files encoded with ALAC (Apple Lossless), which Chrome /
+    Edge / Firefox cannot play directly and must be transcoded to AAC first.
+    """
+    try:
+        import mutagen
+
+        audio = mutagen.File(file_path)
+        if audio is None or audio.info is None:
+            return False
+        codec = (
+            getattr(audio.info, "codec", None)
+            or getattr(audio.info, "codec_name", None)
+            or ""
+        )
+        return codec in _BROWSER_UNSUPPORTED_CODECS
+    except Exception:
+        return False
+
+
+async def transcode_for_browser(file_path: str, song_id: int) -> Optional[str]:
+    """Transcode a browser-unsupported file to AAC/m4a, cached by song id.
+
+    Returns the cached file path, or None when ffmpeg is unavailable or the
+    transcode fails. The cache is reused while the source file is unchanged.
+    """
+    if not is_ffmpeg_available():
+        logger.error("ffmpeg not available; cannot transcode %s", file_path)
+        return None
+
+    cache_dir = settings.data_dir / "transcoded"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    out_path = cache_dir / f"song_{song_id}.m4a"
+
+    try:
+        src_mtime = Path(file_path).stat().st_mtime
+    except OSError:
+        return None
+
+    if out_path.exists() and out_path.stat().st_mtime >= src_mtime:
+        return str(out_path)
+
+    tmp_path = cache_dir / f"song_{song_id}.tmp.m4a"
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i", file_path,
+        "-vn",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-ar", "44100",
+        "-ac", "2",
+        "-movflags", "+faststart",
+        str(tmp_path),
+    ]
+    proc = await asyncio.create_subprocess_exec(
+        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+    _, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        logger.error(f"Browser transcode failed for {file_path}: {stderr.decode()}")
+        tmp_path.unlink(missing_ok=True)
+        return None
+
+    tmp_path.replace(out_path)
+    return str(out_path)
+
+
 async def get_audio_info(file_path: str) -> dict:
     """Get audio file information using ffprobe."""
     if not is_ffmpeg_available():
